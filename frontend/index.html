@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>FortiGate Network Mapper - Générateur d'Architecture</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/cytoscape.min.js"></script>
+</head>
+<body>
+
+  <!-- Header / Top Bar -->
+  <header>
+    <h1>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      FortiGate Network Mapper
+      <span class="badge">V1.0 (Local-Only)</span>
+    </h1>
+
+    <!-- Recherche globale -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <input type="text" id="global-search" placeholder="Rechercher IP, VDOM, zone, règle, port..." style="padding: 6px 12px; border-radius: 4px; border: 1px solid #CBD5E0; width: 300px; color: black;">
+      <button onclick="app.performGlobalSearch()" class="btn-primary" style="padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; background: var(--primary-color); color: white;">Chercher</button>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+      <button onclick="app.showImportScreen()" style="background-color: transparent; border: 1px solid #FFFFFF; color: #FFFFFF; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Nouvel Import</button>
+      <button onclick="app.resetAll()" style="background-color: #E53E3E; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Tout Réinitialiser</button>
+    </div>
+  </header>
+
+  <!-- ÉCRAN D'IMPORTATION (ACCUEIL) -->
+  <div id="import-screen">
+    <div class="import-container">
+      <h2 style="margin-top: 0; color: var(--primary-color); text-align: center;">Générateur Automatique de Topologie Réseau</h2>
+      <p style="text-align: center; color: #718096; margin-bottom: 25px;">
+        Glissez-déposez vos fichiers de configuration FortiGate (.conf, .txt, .cfg) pour reconstruire l'architecture réseau de manière modifiable.
+      </p>
+
+      <!-- Onglets pour Sélection de Mode -->
+      <div class="tabs">
+        <button class="tab-btn active" id="btn-mode-a" onclick="app.switchMode('A')">Mode A — Fichier unique complet</button>
+        <button class="tab-btn" id="btn-mode-b" onclick="app.switchMode('B')">Mode B — Fichiers séparés (Global + 3 VDOMs)</button>
+      </div>
+
+      <!-- Mode A Content -->
+      <div id="mode-a-section">
+        <div class="dropzone" id="dropzone-global" onclick="document.getElementById('file-global').click()">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 10px; color: #A0AEC0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <strong>Sélectionnez ou glissez-déposez le fichier complet</strong>
+          <p>Supporte .conf, .txt, .cfg (Global + 3 VDOMs inclus)</p>
+          <input type="file" id="file-global" style="display: none;" onchange="app.handleFileSelected(this, 'global')">
+        </div>
+        <div class="file-list" id="file-list-global"></div>
+      </div>
+
+      <!-- Mode B Content (Separated Files) -->
+      <div id="mode-b-section" style="display: none;">
+        <h4 style="margin: 0 0 10px;">1. Fichier de Configuration Global (FortiGate)</h4>
+        <div class="dropzone" style="padding: 20px 10px;" onclick="document.getElementById('file-b-global').click()">
+          <strong>Fichier Global</strong>
+          <input type="file" id="file-b-global" style="display: none;" onchange="app.handleFileSelected(this, 'b-global')">
+        </div>
+        <div class="file-list" id="file-list-b-global"></div>
+
+        <h4 style="margin: 15px 0 10px;">2. Fichiers de Configuration VDOMs (Optionnels)</h4>
+        <div class="grid-2">
+          <div>
+            <label style="font-size: 0.8rem; font-weight: bold;">VDOM 1 (Nom)</label>
+            <input type="text" id="vdom-name-1" value="root" style="width: 100%; padding: 6px; margin-bottom: 5px; border: 1px solid #CBD5E0; border-radius: 4px;">
+            <input type="file" id="file-vdom-1" onchange="app.handleFileSelected(this, 'vdom-1')">
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; font-weight: bold;">VDOM 2 (Nom)</label>
+            <input type="text" id="vdom-name-2" value="vdom_lan" style="width: 100%; padding: 6px; margin-bottom: 5px; border: 1px solid #CBD5E0; border-radius: 4px;">
+            <input type="file" id="file-vdom-2" onchange="app.handleFileSelected(this, 'vdom-2')">
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <label style="font-size: 0.8rem; font-weight: bold;">VDOM 3 (Nom)</label>
+          <input type="text" id="vdom-name-3" value="vdom_dmz" style="width: 100%; padding: 6px; margin-bottom: 5px; border: 1px solid #CBD5E0; border-radius: 4px;">
+          <input type="file" id="file-vdom-3" onchange="app.handleFileSelected(this, 'vdom-3')">
+        </div>
+      </div>
+
+      <!-- Options d'Anonymisation -->
+      <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+        <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">
+          <input type="checkbox" id="chk-anonymize">
+          Anonymiser les adresses IP (conversion automatique)
+        </label>
+        <p style="margin: 5px 0 0 25px; font-size: 0.75rem; color: #718096;">
+          Masque les adresses IP réelles et supprime les secrets (mots de passe, PSK) pour garantir la confidentialité absolue.
+        </p>
+      </div>
+
+      <!-- Action Button -->
+      <button onclick="app.triggerAnalysis()" class="btn-primary" style="margin-top: 25px; width: 100%; padding: 12px; font-size: 1.1rem; border-radius: 6px; border: none; cursor: pointer; background-color: var(--primary-color); color: white; font-weight: bold;">
+        Analyser la Configuration & Générer l'Architecture
+      </button>
+    </div>
+  </div>
+
+  <!-- ÉCRAN DES RÉSULTATS (DIAGRAMME & ANALYSE) -->
+  <div id="main-screen">
+
+    <!-- Barre Latérale Gauche - Couches et Filtres -->
+    <div class="left-sidebar">
+      <div class="section-title">Synthèse de l'Analyse</div>
+      <div class="sidebar-content" style="background-color: #EDF2F7; font-size: 0.8rem; border-bottom: 1px solid var(--border-color);">
+        <p style="margin: 2px 0;"><strong>Hostname :</strong> <span id="syn-hostname">-</span></p>
+        <p style="margin: 2px 0;"><strong>Modèle :</strong> <span id="syn-model">-</span></p>
+        <p style="margin: 2px 0;"><strong>Version FortiOS :</strong> <span id="syn-version">-</span></p>
+        <p style="margin: 2px 0;"><strong>Numéro de Série :</strong> <span id="syn-serial">-</span></p>
+      </div>
+
+      <!-- Couches Activables -->
+      <div class="section-title">Couches Visuelles</div>
+      <div class="sidebar-content">
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" checked onchange="app.toggleLayer('physical', this.checked)">
+            Topologie Physique (Interfaces)
+          </label>
+        </div>
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" checked onchange="app.toggleLayer('logical', this.checked)">
+            Topologie Logique (Zones / VDOM)
+          </label>
+        </div>
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" checked onchange="app.toggleLayer('vpn', this.checked)">
+            Tunnels VPN IPsec / SSL
+          </label>
+        </div>
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" checked onchange="app.toggleLayer('vip', this.checked)">
+            VIP et NAT (DNAT/SNAT)
+          </label>
+        </div>
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+            <input type="checkbox" checked onchange="app.toggleLayer('flows', this.checked)">
+            Flux de Politiques Firewall
+          </label>
+        </div>
+      </div>
+
+      <!-- Filtres de Visibilité -->
+      <div class="section-title">Filtres Actifs</div>
+      <div class="sidebar-content">
+        <div class="filter-group">
+          <label>VDOM Focus</label>
+          <select id="filter-vdom" onchange="app.applyFilters()">
+            <option value="all">Tous les VDOMs</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Règles Filtrées</label>
+          <select id="filter-policies" onchange="app.applyFilters()">
+            <option value="all">Toutes les règles</option>
+            <option value="active">Règles actives uniquement</option>
+            <option value="deny">Règles d'interdiction (Deny)</option>
+            <option value="nat">Avec NAT activé</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Masquage Réseaux</label>
+          <label style="display: flex; align-items: center; gap: 5px; font-weight: normal; font-size: 0.8rem; margin-top: 5px;">
+            <input type="checkbox" id="chk-hide-unused" onchange="app.applyFilters()">
+            Masquer objets réseau inutilisés
+          </label>
+        </div>
+      </div>
+
+      <!-- Ajouter des Équipements Manuellement -->
+      <div class="section-title">Annotations & Ajouts</div>
+      <div class="sidebar-content">
+        <div class="filter-group">
+          <label>Type d'équipement à ajouter</label>
+          <select id="add-node-type">
+            <option value="server">Serveur Local</option>
+            <option value="subnet">Sous-réseau personnalisé</option>
+            <option value="remote_site">Site Distant</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Nom / Annotation</label>
+          <input type="text" id="add-node-label" placeholder="Ex: Serveur Web">
+        </div>
+        <button onclick="app.addCustomNode()" class="btn-primary" style="width: 100%; padding: 6px; border: none; border-radius: 4px; cursor: pointer;">
+          Ajouter au Diagramme
+        </button>
+      </div>
+
+      <!-- Qualité de l'Analyse -->
+      <div class="section-title">Qualité & Statistiques</div>
+      <div class="sidebar-content" id="quality-report-sidebar" style="font-size: 0.85rem;">
+        <!-- Rempli dynamiquement -->
+      </div>
+    </div>
+
+    <!-- Zone Centrale - Diagramme de Topologie -->
+    <div class="diagram-area">
+      <!-- Barre d'outils du diagramme -->
+      <div class="toolbar">
+        <button onclick="app.reorganizeLayout()" class="btn-primary" title="Réorganiser automatiquement">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+          Réordonner Automatiquement
+        </button>
+        <button onclick="app.zoomIn()" title="Zoomer">Zoom +</button>
+        <button onclick="app.zoomOut()" title="Dézoomer">Zoom -</button>
+        <button onclick="app.fitToScreen()" title="Ajuster à l'écran">Ajuster</button>
+
+        <span style="color: #CBD5E0; margin: 0 5px;">|</span>
+
+        <!-- Exports -->
+        <button onclick="app.exportDrawio()" title="Exporter pour Draw.io (.drawio)">Exporter Draw.io</button>
+        <button onclick="app.exportStandaloneHTML()" title="Exporter en HTML interactif">HTML Autonome</button>
+        <button onclick="app.exportJSON()" title="Exporter en JSON brut">JSON</button>
+
+        <!-- Indicateur d'Anomalies -->
+        <span style="flex-grow: 1;"></span>
+        <div style="background-color: #FED7D7; color: #9B2C2C; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+          Anomalies détectées : <span id="anomalies-count">0</span>
+        </div>
+      </div>
+
+      <!-- Canevas interactif Cytoscape -->
+      <div id="cy"></div>
+
+      <!-- Pied de Page - Inventaires complémentaires -->
+      <div id="inventory-area">
+        <div class="inventory-tabs" id="tabs-inventaire">
+          <div class="inv-tab active" onclick="app.switchInventory('interfaces', this)">Interfaces</div>
+          <div class="inv-tab" onclick="app.switchInventory('zones', this)">Zones</div>
+          <div class="inv-tab" onclick="app.switchInventory('routes', this)">Routage</div>
+          <div class="inv-tab" onclick="app.switchInventory('objects', this)">Objets Réseau</div>
+          <div class="inv-tab" onclick="app.switchInventory('policies', this)">Règles Firewall</div>
+          <div class="inv-tab" onclick="app.switchInventory('vips', this)">VIPs</div>
+          <div class="inv-tab" onclick="app.switchInventory('vpns', this)">VPNs</div>
+          <div class="inv-tab" onclick="app.switchInventory('findings', this)" style="background-color: #FFF5F5; color: #C53030;">Contrôles de Cohérence</div>
+        </div>
+        <div class="toolbar" style="padding: 4px 10px; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; display: flex; justify-content: space-between;">
+          <span>Double-cliquez sur une ligne pour centrer l'élément sur le diagramme.</span>
+          <button onclick="app.downloadCurrentCSV()" style="padding: 2px 8px; font-size: 0.75rem;">Télécharger cet inventaire (CSV)</button>
+        </div>
+        <div class="inventory-content" id="inventory-table-container">
+          <!-- Les tableaux d'inventaire seront générés ici -->
+          <table>
+            <thead><tr><th>Veuillez charger un fichier pour afficher l'inventaire</th></tr></thead>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barre Latérale Droite - Propriétés détaillées de l'élément sélectionné -->
+    <div class="right-sidebar">
+      <div class="section-title">Propriétés de l'Élément</div>
+      <div class="sidebar-content" id="properties-panel" style="font-size: 0.85rem; flex: 1;">
+        <div style="color: #718096; text-align: center; margin-top: 50px;">
+          Cliquez sur un équipement, une zone ou une liaison de flux pour afficher ses propriétés complètes.
+        </div>
+      </div>
+
+      <!-- Bloc pour Visualiser la Configuration Source d'origine -->
+      <div class="section-title" style="border-top: 1px solid var(--border-color);">Source FortiGate d'origine</div>
+      <div class="sidebar-content" id="source-tracing-panel" style="background-color: #1A202C; color: #A3BDF2; font-family: monospace; font-size: 0.75rem; padding: 10px; height: 180px; overflow-y: auto; white-space: pre-wrap;">
+        <span style="color: #718096;">Aucun bloc de configuration sélectionné.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL POUR VOIR LE BLOC SOURCE COMPLET -->
+  <div id="source-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="source-modal-title" style="margin: 0; color: var(--primary-color);">Configuration FortiGate d'origine</h3>
+        <span class="close" onclick="app.closeSourceModal()">&times;</span>
+      </div>
+      <div style="font-size: 0.85rem; margin-bottom: 10px; color: #4A5568;">
+        <strong>Fichier :</strong> <span id="source-modal-file">-</span> |
+        <strong>Lignes :</strong> <span id="source-modal-lines">-</span>
+      </div>
+      <pre id="source-modal-code"></pre>
+    </div>
+  </div>
+
+  <!-- Code principal applicatif frontend -->
+  <script src="js/app.js"></script>
+</body>
+</html>
