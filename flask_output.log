@@ -6,8 +6,8 @@
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 631-326-424
-127.0.0.1 - - [16/Jul/2026 08:35:38] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [16/Jul/2026 08:35:38] "GET /js/cytoscape.min.js HTTP/1.1" 200 -
-127.0.0.1 - - [16/Jul/2026 08:35:38] "GET /css/style.css HTTP/1.1" 200 -
-127.0.0.1 - - [16/Jul/2026 08:35:38] "GET /js/app.js HTTP/1.1" 200 -
-127.0.0.1 - - [16/Jul/2026 08:35:40] "POST /api/analyze HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jul/2026 10:04:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jul/2026 10:04:27] "GET /js/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jul/2026 10:04:27] "GET /js/cytoscape.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jul/2026 10:04:27] "GET /css/style.css HTTP/1.1" 200 -
+127.0.0.1 - - [16/Jul/2026 10:04:29] "POST /api/analyze HTTP/1.1" 200 -

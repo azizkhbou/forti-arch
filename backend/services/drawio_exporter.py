@@ -171,6 +171,10 @@ class DrawioExporter:
                     edge_style += "strokeColor=#60A917;" # green
             elif edge.get("type") == "subnet_link_deduced":
                 edge_style += "strokeColor=#D6B656;dashed=1;"
+            elif edge.get("type") == "inter_vdom_link":
+                edge_style += "strokeColor=#6A0DAD;strokeWidth=2.5;" # Bold Purple for inter-VDOM
+                if edge.get("dashed") or edge.get("style") == "dashed":
+                    edge_style += "dashed=1;"
 
             cell_attrs = {
                 "id": eid,
