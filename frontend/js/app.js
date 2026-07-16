@@ -382,9 +382,7 @@ class FortiGateApp {
                 }
             ],
             layout: {
-                name: 'cose',
-                animate: false,
-                padding: 40
+                name: 'preset'
             }
         });
 
@@ -394,24 +392,156 @@ class FortiGateApp {
             this.showProperties(target);
         });
 
-        // Trigger an initial nice organization
+        // Trigger our beautiful, clean hierarchical structure
         this.reorganizeLayout();
     }
 
     reorganizeLayout() {
         if (!this.cy) return;
 
-        // Auto-position nodes beautifully: WAN at top, firewall at center, VDOMs nested around/below
-        // Using preset positioning based on relationship_engine node properties, or letting cose run
-        const layout = this.cy.layout({
-            name: 'cose',
-            componentSpacing: 100,
-            nestingFactor: 1.2,
-            gravity: 1,
-            animate: true,
-            animationDuration: 400
+        // Elegant layout algorithm:
+        // Internet is always at top center: {x: 600, y: 50}
+        // Firewall FortiGate centered at: {x: 600, y: 150}
+        // VDOMs side by side under the Firewall
+
+        const vdoms = this.cy.nodes('[type="vdom"]');
+        const vdomCount = vdoms.length;
+
+        // Define center positions dynamically
+        const internetNode = this.cy.getElementById('node_internet');
+        if (internetNode.length > 0) {
+            internetNode.position({ x: 600, y: 50 });
+        }
+
+        const fgtNode = this.cy.getElementById('node_fortigate');
+        if (fgtNode.length > 0) {
+            fgtNode.position({ x: 600, y: 150 });
+        }
+
+        const startX = 600 - ((vdomCount - 1) * 450) / 2;
+        const vdomY = 320;
+
+        vdoms.forEach((vdomNode, idx) => {
+            const vdomX = startX + (idx * 450);
+            vdomNode.position({ x: vdomX, y: vdomY });
+
+            const vdomId = vdomNode.id();
+
+            // Layout children within this VDOM container in structured columns:
+            // LAN (Users, Left side of VDOM box)
+            // DMZ / Servers / VIPs (Right side of VDOM box)
+            // Transit / VPNs (Center of VDOM box)
+
+            const zones = this.cy.nodes(`[type="zone"][parent="${vdomId}"]`);
+            const interfaces = this.cy.nodes(`[type="interface"][parent="${vdomId}"]`);
+            const subnets = this.cy.nodes(`[type="subnet"][parent="${vdomId}"]`);
+            const vips = this.cy.nodes(`[type="vip"][parent="${vdomId}"]`);
+            const vpns = this.cy.nodes(`[type="vpn"][parent="${vdomId}"]`);
+            const servers = this.cy.nodes(`[type="server"][parent="${vdomId}"]`);
+
+            // 1. LAN column (Left, Offset x: -150)
+            let lanY = vdomY + 80;
+            zones.forEach(zone => {
+                const zName = zone.data('label').toLowerCase();
+                if (zName.includes('lan') || zName.includes('internal') || zName.includes('usr')) {
+                    zone.position({ x: vdomX - 150, y: lanY });
+
+                    // Position interfaces inside LAN zone
+                    const zoneId = zone.id();
+                    const zoneIntfs = this.cy.nodes(`[type="interface"][parent="${zoneId}"]`);
+                    zoneIntfs.forEach((zi, zidx) => {
+                        zi.position({ x: vdomX - 150, y: lanY + 50 + (zidx * 60) });
+                    });
+                    lanY += 150;
+                }
+            });
+
+            // LAN interfaces not inside zones
+            interfaces.forEach(intf => {
+                const label = intf.data('label').toLowerCase();
+                const parent = intf.data('parent');
+                if (parent === vdomId && (label.includes('lan') || label.includes('port2'))) {
+                    intf.position({ x: vdomX - 150, y: lanY });
+                    lanY += 70;
+                }
+            });
+
+            // LAN subnets
+            subnets.forEach(sub => {
+                const label = sub.data('label').toLowerCase();
+                if (label.includes('lan') || label.includes('10.')) {
+                    sub.position({ x: vdomX - 150, y: lanY });
+                    lanY += 75;
+                }
+            });
+
+            // 2. DMZ & Servers column (Right, Offset x: 150)
+            let dmzY = vdomY + 80;
+            zones.forEach(zone => {
+                const zName = zone.data('label').toLowerCase();
+                if (zName.includes('dmz') || zName.includes('srv') || zName.includes('server')) {
+                    zone.position({ x: vdomX + 150, y: dmzY });
+
+                    const zoneId = zone.id();
+                    const zoneIntfs = this.cy.nodes(`[type="interface"][parent="${zoneId}"]`);
+                    zoneIntfs.forEach((zi, zidx) => {
+                        zi.position({ x: vdomX + 150, y: dmzY + 50 + (zidx * 60) });
+                    });
+                    dmzY += 150;
+                }
+            });
+
+            interfaces.forEach(intf => {
+                const label = intf.data('label').toLowerCase();
+                const parent = intf.data('parent');
+                if (parent === vdomId && (label.includes('dmz') || label.includes('srv') || label.includes('port3'))) {
+                    intf.position({ x: vdomX + 150, y: dmzY });
+                    dmzY += 70;
+                }
+            });
+
+            vips.forEach(vip => {
+                vip.position({ x: vdomX + 150, y: dmzY });
+                dmzY += 80;
+            });
+
+            servers.forEach(srv => {
+                srv.position({ x: vdomX + 150, y: dmzY });
+                dmzY += 70;
+            });
+
+            // 3. Transit, WAN and VPN column (Center, Offset x: 0)
+            let transitY = vdomY + 80;
+            interfaces.forEach(intf => {
+                const label = intf.data('label').toLowerCase();
+                const parent = intf.data('parent');
+                if (parent === vdomId && (label.includes('wan') || label.includes('port1') || label.includes('vlink'))) {
+                    intf.position({ x: vdomX, y: transitY });
+                    transitY += 70;
+                }
+            });
+
+            vpns.forEach(vpn => {
+                vpn.position({ x: vdomX, y: transitY });
+                transitY += 75;
+            });
+
+            subnets.forEach(sub => {
+                const label = sub.data('label').toLowerCase();
+                if (label.includes('any') || label.includes('0.0.0.0')) {
+                    sub.position({ x: vdomX, y: transitY });
+                    transitY += 75;
+                }
+            });
         });
-        layout.run();
+
+        // Remote sites placed beautifully on bottom sides
+        const remoteSites = this.cy.nodes('[type="remote_site"]');
+        remoteSites.forEach((site, sIdx) => {
+            site.position({ x: sIdx % 2 === 0 ? 100 : 1100, y: 650 + (Math.floor(sIdx / 2) * 90) });
+        });
+
+        this.cy.fit();
     }
 
     zoomIn() { this.cy && this.cy.zoom(this.cy.zoom() + 0.1); }
@@ -624,7 +754,7 @@ class FortiGateApp {
         }
     }
 
-    closeSourceModal() {
+    onCloseSourceModal() {
         document.getElementById('source-modal').style.display = 'none';
     }
 

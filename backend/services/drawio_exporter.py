@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 import html
+import re
 
 class DrawioExporter:
     """
@@ -125,7 +126,6 @@ class DrawioExporter:
             # Set custom metadata for hover Tooltips in Draw.io if available
             metadata_str = ""
             if "details" in node:
-                # Draw.io can parse custom metadata, but for simplicity we encode key properties as an HTML value/tooltip
                 details = node["details"]
                 tooltip_parts = [f"{k}: {v}" for k, v in details.items() if v]
                 metadata_str = "\n".join(tooltip_parts)
@@ -182,7 +182,6 @@ class DrawioExporter:
                 "edge": "1"
             }
             cell = ET.SubElement(root, "mxCell", cell_attrs)
-            # Add basic geo layout info for edge
             geom = ET.SubElement(cell, "mxGeometry", {
                 "relative": "1",
                 "as": "geometry"
@@ -193,66 +192,103 @@ class DrawioExporter:
     @staticmethod
     def calculate_fallback_layout(nodes):
         """
-        Creates a nice Grid/Block layout if coordinates are not supplied.
-        - Internet and WAN on top (y: 50-150)
-        - FortiGate Central box (y: 200)
-        - VDOMs side by side or vertically (y: 350 onwards)
-        - Subnets & Servers organized neatly
+        Creates a structured, non-overlapping layout:
+        - Internet is top-center.
+        - FortiGate box is next.
+        - VDOMs side by side under FortiGate.
+        - Interfaces, subnets organized inside columns (Left for LAN, Center for Transit/VPN, Right for DMZ/VIP).
         """
         coords = {}
 
-        # Position FortiGate
-        coords["node_fortigate"] = {"x": 400, "y": 200, "width": 450, "height": 550}
-        coords["node_internet"] = {"x": 500, "y": 30, "width": 120, "height": 80}
-
-        vdom_x = 50
-        vdom_y = 300
+        # Position FortiGate and Internet
+        coords["node_internet"] = {"x": 600, "y": 50, "width": 120, "height": 80}
+        coords["node_fortigate"] = {"x": 350, "y": 180, "width": 620, "height": 450}
 
         # Detect VDOMs
         vdom_nodes = [n for n in nodes if n["type"] == "vdom"]
 
+        vdom_x = 50
+        vdom_y = 260
+
         for idx, v_node in enumerate(vdom_nodes):
             vid = v_node["id"]
             # Position VDOM container
-            coords[vid] = {"x": vdom_x + (idx * 380), "y": vdom_y, "width": 350, "height": 400}
+            coords[vid] = {"x": vdom_x + (idx * 480), "y": vdom_y, "width": 450, "height": 380}
 
-            # Position nested child elements within this VDOM
-            vdom_name = v_node["details"]["name"]
-
-            # Get zones and items in this vdom
+            # Position elements inside this VDOM (Relative coordinates to parent)
+            # 1. LAN column (Left)
+            lan_y = 60
             v_zones = [n for n in nodes if n["type"] == "zone" and n.get("parent") == vid]
-            v_intfs = [n for n in nodes if n["type"] == "interface" and (n.get("parent") == vid or n.get("parent") in [z["id"] for z in v_zones])]
-            v_vips = [n for n in nodes if n["type"] == "vip" and n.get("parent") == vid]
-            v_vpns = [n for n in nodes if n["type"] == "vpn" and n.get("parent") == vid]
-            v_subnets = [n for n in nodes if n["type"] == "subnet" and n.get("parent") == vid]
-            v_servers = [n for n in nodes if n["type"] == "server" and n.get("parent") == vid]
 
-            # Coordinates are RELATIVE to the parent container in Draw.io
-            # Let's stack zones inside VDOM
-            zone_y = 50
-            for z_idx, zone in enumerate(v_zones):
-                coords[zone["id"]] = {"x": 20, "y": zone_y, "width": 310, "height": 100}
+            for zone in v_zones:
+                z_name = zone["label"].lower()
+                if "lan" in z_name or "internal" in z_name or "usr" in z_name:
+                    coords[zone["id"]] = {"x": 20, "y": lan_y, "width": 130, "height": 100}
 
-                # Position interfaces inside zone
-                z_intfs = [i for i in v_intfs if i.get("parent") == zone["id"]]
-                for i_idx, intf in enumerate(z_intfs):
-                    coords[intf["id"]] = {"x": 15 + (i_idx * 95), "y": 35, "width": 85, "height": 45}
+                    # Inside LAN zone
+                    z_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == zone["id"]]
+                    for i_idx, intf in enumerate(z_intfs):
+                        coords[intf["id"]] = {"x": 10, "y": 35 + (i_idx * 45), "width": 110, "height": 40}
+                    lan_y += 110
 
-                zone_y += 115
+            # Standard LAN interfaces/subnets
+            lan_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("lan" in i["label"].lower() or "port2" in i["label"].lower())]
+            for i in lan_intfs:
+                coords[i["id"]] = {"x": 20, "y": lan_y, "width": 110, "height": 40}
+                lan_y += 45
 
-            # Non-zoned interfaces (standalones)
-            no_zone_intfs = [i for i in v_intfs if i.get("parent") == vid]
-            for i_idx, intf in enumerate(no_zone_intfs):
-                coords[intf["id"]] = {"x": 20 + (i_idx * 95), "y": zone_y, "width": 85, "height": 45}
+            lan_subs = [s for s in nodes if s["type"] == "subnet" and s.get("parent") == vid and ("lan" in s["label"].lower() or "10." in s["label"].lower())]
+            for s in lan_subs:
+                coords[s["id"]] = {"x": 20, "y": lan_y, "width": 110, "height": 45}
+                lan_y += 50
 
-            # Position VIPs and subnets below
-            item_y = zone_y + 60
-            for idx2, item in enumerate(v_vips + v_vpns + v_subnets + v_servers):
-                coords[item["id"]] = {"x": 20 + ((idx2 % 3) * 105), "y": item_y + ((idx2 // 3) * 75), "width": 95, "height": 55}
+            # 2. DMZ / Servers column (Right)
+            dmz_y = 60
+            for zone in v_zones:
+                z_name = zone["label"].lower()
+                if "dmz" in z_name or "srv" in z_name or "server" in z_name:
+                    coords[zone["id"]] = {"x": 300, "y": dmz_y, "width": 130, "height": 100}
 
-        # Other loose nodes like remote sites
+                    z_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == zone["id"]]
+                    for i_idx, intf in enumerate(z_intfs):
+                        coords[intf["id"]] = {"x": 10, "y": 35 + (i_idx * 45), "width": 110, "height": 40}
+                    dmz_y += 110
+
+            dmz_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("dmz" in i["label"].lower() or "port3" in i["label"].lower())]
+            for i in dmz_intfs:
+                coords[i["id"]] = {"x": 300, "y": dmz_y, "width": 110, "height": 40}
+                dmz_y += 45
+
+            vips = [v for v in nodes if v["type"] == "vip" and v.get("parent") == vid]
+            for v in vips:
+                coords[v["id"]] = {"x": 300, "y": dmz_y, "width": 110, "height": 45}
+                dmz_y += 50
+
+            srvs = [s for s in nodes if s["type"] == "server" and s.get("parent") == vid]
+            for s in srvs:
+                coords[s["id"]] = {"x": 300, "y": dmz_y, "width": 110, "height": 40}
+                dmz_y += 45
+
+            # 3. WAN / VPN column (Center)
+            wan_y = 60
+            wan_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("wan" in i["label"].lower() or "port1" in i["label"].lower() or "vlink" in i["label"].lower())]
+            for i in wan_intfs:
+                coords[i["id"]] = {"x": 160, "y": wan_y, "width": 120, "height": 40}
+                wan_y += 45
+
+            vpns = [v for v in nodes if v["type"] == "vpn" and v.get("parent") == vid]
+            for v in vpns:
+                coords[v["id"]] = {"x": 160, "y": wan_y, "width": 110, "height": 45}
+                wan_y += 50
+
+            any_subs = [s for s in nodes if s["type"] == "subnet" and s.get("parent") == vid and ("any" in s["label"].lower() or "0.0.0.0" in s["label"].lower())]
+            for s in any_subs:
+                coords[s["id"]] = {"x": 160, "y": wan_y, "width": 110, "height": 45}
+                wan_y += 50
+
+        # Position remote sites at the bottom edges
         remote_nodes = [n for n in nodes if n["type"] == "remote_site"]
         for idx, rn in enumerate(remote_nodes):
-            coords[rn["id"]] = {"x": 10 + (idx * 130), "y": 750, "width": 100, "height": 60}
+            coords[rn["id"]] = {"x": 100 + (idx * 800), "y": 680, "width": 110, "height": 60}
 
         return coords
