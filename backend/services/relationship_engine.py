@@ -8,6 +8,8 @@ class RelationshipEngine:
     - Inter-VDOM connections
     - VIP targets
     - Inferred mappings using IP longest prefix matches
+    - Cross-VDOM pairing of vdom-link interfaces
+    - Cross-VDOM address and subnet matching
     """
     @staticmethod
     def build_relationships(device):
@@ -85,7 +87,6 @@ class RelationshipEngine:
                     if found_zone:
                         parent_id = f"zone_{vdom_name}_{found_zone}"
 
-                # Define role & type colors/tags
                 topology["nodes"].append({
                     "id": intf_node_id,
                     "label": f"{intf_name}\n{intf.ip}/{intf.mask}" if intf.ip != "0.0.0.0" else intf_name,
@@ -106,7 +107,7 @@ class RelationshipEngine:
                     }
                 })
 
-                # If interface has WAN role or parent suggests WAN, link it to Internet
+                # WAN interfaces link to Internet
                 if intf.role.lower() == "wan" or "wan" in intf_name.lower() or "internet" in intf_name.lower():
                     topology["edges"].append({
                         "id": f"edge_wan_{intf_node_id}",
@@ -120,7 +121,6 @@ class RelationshipEngine:
             for vip_name, vip in vdom.vips.items():
                 vip_node_id = f"vip_{vdom_name}_{vip_name.replace(' ', '_')}"
 
-                # Find appropriate parent vdom
                 topology["nodes"].append({
                     "id": vip_node_id,
                     "label": f"VIP: {vip_name}\nExt: {vip.extip}\nInt: {vip.mappedip}",
@@ -137,7 +137,6 @@ class RelationshipEngine:
                     }
                 })
 
-                # Link VIP to external interface if set
                 if vip.extintf != "any":
                     ext_intf_id = f"intf_{vdom_name}_{vip.extintf.replace('/', '_').replace('.', '_')}"
                     topology["edges"].append({
@@ -148,7 +147,6 @@ class RelationshipEngine:
                         "type": "vip_link"
                     })
                 else:
-                    # Link to internet directly or any WAN interface
                     topology["edges"].append({
                         "id": f"edge_vip_internet_{vip_node_id}",
                         "source": "node_internet",
@@ -157,11 +155,7 @@ class RelationshipEngine:
                         "type": "vip_link"
                     })
 
-                # Create inferred internal server or link to internal network if matching
-                # Check if mappedip matches an address object or subnet
                 server_node_id = f"srv_{vdom_name}_{vip.mappedip.replace('.', '_')}"
-
-                # Verify if we should create this internal server node
                 topology["nodes"].append({
                     "id": server_node_id,
                     "label": f"Serveur\n{vip.mappedip}",
@@ -174,7 +168,6 @@ class RelationshipEngine:
                     }
                 })
 
-                # Link VIP to internal Server
                 topology["edges"].append({
                     "id": f"edge_vip_int_{vip_node_id}",
                     "source": vip_node_id,
@@ -202,7 +195,6 @@ class RelationshipEngine:
                     }
                 })
 
-                # If remote gateway is known, draw a link to external site
                 if vpn.remote_gw:
                     ext_site_id = f"site_dist_{vdom_name}_{vpn_name.replace(' ', '_')}"
                     topology["nodes"].append({
@@ -212,7 +204,6 @@ class RelationshipEngine:
                         "details": {"gateway": vpn.remote_gw, "vpn": vpn_name}
                     })
 
-                    # Connection between firewall/internet to external site
                     topology["edges"].append({
                         "id": f"edge_vpn_tunnel_{vpn_node_id}",
                         "source": vpn_node_id,
@@ -222,7 +213,6 @@ class RelationshipEngine:
                         "dashed": True
                     })
 
-                    # Also link vpn back to physical interface if configured
                     if vpn.interface:
                         ph_intf_id = f"intf_{vdom_name}_{vpn.interface.replace('/', '_').replace('.', '_')}"
                         topology["edges"].append({
@@ -233,10 +223,9 @@ class RelationshipEngine:
                             "type": "vpn_link"
                         })
 
-            # Sub-track for explicit or inferred subnet networks from Address Objects
+            # Subnets and Address Objects
             for addr_name, addr in vdom.address_objects.items():
                 if addr.type == "subnet" and addr.value and addr.value != "0.0.0.0/0":
-                    # Create a subnet visual node
                     sub_node_id = f"subnet_{vdom_name}_{addr_name.replace(' ', '_')}"
                     topology["nodes"].append({
                         "id": sub_node_id,
@@ -251,7 +240,7 @@ class RelationshipEngine:
                         }
                     })
 
-                    # Link to its associated interface (explicit)
+                    # Link to its associated interface (local)
                     if addr.associated_interface and addr.associated_interface in vdom.interfaces:
                         intf_ref_id = f"intf_{vdom_name}_{addr.associated_interface.replace('/', '_').replace('.', '_')}"
                         topology["edges"].append({
@@ -262,8 +251,7 @@ class RelationshipEngine:
                             "type": "subnet_link"
                         })
                     else:
-                        # INFERRED RELATIONSHIP (Longest Prefix Match)
-                        # Let's try to match the subnet value with any interface IP/mask
+                        # LOCAL INFERRED RELATIONSHIP (Longest Prefix Match)
                         inferred_intf = RelationshipEngine.find_matching_interface(addr.value, vdom.interfaces)
                         if inferred_intf:
                             intf_ref_id = f"intf_{vdom_name}_{inferred_intf.replace('/', '_').replace('.', '_')}"
@@ -277,23 +265,31 @@ class RelationshipEngine:
                                 "details": {"logic": f"Le sous-réseau '{addr.value}' appartient à la plage d'IP de l'interface '{inferred_intf}'."}
                             })
 
-        # 3. Inter-VDOM links detection & addition
-        # Check system vdom-links
-        # First, search all physical or virtual interfaces across vdoms to find links matching 'vdom-link'
-        inter_vdoms_paired = []
-        for vdom_name, vdom in device.vdoms.items():
-            for ivl in vdom.inter_vdom_links:
-                # FortiOS handles vdom-link with interface config. We will identify interfaces with type 'vdom-link'
-                # or named similar. Let's do a cross VDOM lookup for interfaces sharing the same vdom-link name
-                pass
+                        # CROSS-VDOM ADDRESS RESOLUTION:
+                        # If the subnet belongs to an interface in a DIFFERENT VDOM, we explicitly draw an inter-VDOM network link.
+                        for other_vdom_name, other_vdom in device.vdoms.items():
+                            if other_vdom_name != vdom_name:
+                                cross_intf = RelationshipEngine.find_matching_interface(addr.value, other_vdom.interfaces)
+                                if cross_intf:
+                                    cross_intf_id = f"intf_{other_vdom_name}_{cross_intf.replace('/', '_').replace('.', '_')}"
+                                    topology["edges"].append({
+                                        "id": f"edge_cross_vdom_inf_{sub_node_id}_{cross_intf_id}",
+                                        "source": cross_intf_id,
+                                        "target": sub_node_id,
+                                        "label": "Déduit (Lien inter-VDOM via IP)",
+                                        "type": "inter_vdom_link",
+                                        "dashed": True,
+                                        "details": {
+                                            "logic": f"Le sous-réseau '{addr.value}' déclaré dans le VDOM '{vdom_name}' correspond à l'interface physique '{cross_intf}' située dans le VDOM '{other_vdom_name}'."
+                                        }
+                                    })
 
-        # Simple heuristic: if we have interfaces of type "vdom-link" across VDOMs with similar parent name, link them!
+        # 3. INTER-VDOM LINKS: Pair 'vdom-link' interfaces explicitly
         vdom_links_list = {}
         for vdom_name, vdom in device.vdoms.items():
             for intf_name, intf in vdom.interfaces.items():
-                # On newer FortiOS, a vdom-link interface edit block has "set type vdom-link" or name ends in '0' or '1'
                 if intf.type == "vdom-link" or "vlink" in intf_name.lower():
-                    # Strip trailing numbers or '0'/'1' to find pairs
+                    # Extract the base prefix of the vdom-link pair (e.g. "vlink_lan" from "vlink_lan0" and "vlink_lan1")
                     base_name = re.sub(r'[01]$', '', intf_name)
                     vdom_links_list.setdefault(base_name, []).append((vdom_name, intf_name))
 
@@ -309,7 +305,7 @@ class RelationshipEngine:
                             "id": f"edge_ivl_{va}_{vb}_{base}",
                             "source": node_a_id,
                             "target": node_b_id,
-                            "label": f"Inter-VDOM ({base})",
+                            "label": f"Liaison Inter-VDOM ({base})",
                             "type": "inter_vdom_link",
                             "style": "bold"
                         })
@@ -319,23 +315,18 @@ class RelationshipEngine:
             for pol in vdom.policies:
                 if pol.status == "disable":
                     continue
-                # For each srcintf -> dstintf, draw an edge (flow)
                 for src in pol.srcintf:
                     for dst in pol.dstintf:
-                        # Find corresponding source & destination nodes in the graph
                         src_id = None
                         dst_id = None
 
-                        # Source can be interface or zone
                         if src in vdom.zones:
                             src_id = f"zone_{vdom_name}_{src}"
                         elif src in vdom.interfaces:
                             src_id = f"intf_{vdom_name}_{src.replace('/', '_').replace('.', '_')}"
                         elif src.lower() == "any":
-                            # map to any or vdom container
                             src_id = f"vdom_{vdom_name}"
 
-                        # Destination can be interface or zone
                         if dst in vdom.zones:
                             dst_id = f"zone_{vdom_name}_{dst}"
                         elif dst in vdom.interfaces:
@@ -375,7 +366,6 @@ class RelationshipEngine:
         Calculates longest prefix match logic to map a subnet object
         to its matching internal physical/VLAN interface network.
         """
-        # format: 192.168.1.0/24 or "192.168.1.0 255.255.255.0"
         sub_ip, sub_mask = RelationshipEngine.parse_cidr_or_mask(subnet_cidr)
         if not sub_ip or sub_ip == "0.0.0.0":
             return None
@@ -383,7 +373,6 @@ class RelationshipEngine:
         for name, intf in interfaces.items():
             if intf.ip == "0.0.0.0":
                 continue
-            # Simple octet match comparison for IP networking
             intf_sub = RelationshipEngine.get_network_base(intf.ip, intf.mask)
             obj_sub = RelationshipEngine.get_network_base(sub_ip, sub_mask)
             if intf_sub == obj_sub and intf_sub != "0.0.0.0":
@@ -397,7 +386,6 @@ class RelationshipEngine:
         if "/" in cidr_str:
             parts = cidr_str.split("/")
             ip = parts[0]
-            # convert cidr to subnet mask
             try:
                 cidr = int(parts[1])
                 mask = RelationshipEngine.cidr_to_mask(cidr)
