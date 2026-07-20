@@ -113,36 +113,47 @@
         <p style="margin: 2px 0;"><strong>Numéro de Série :</strong> <span id="syn-serial">-</span></p>
       </div>
 
+      <!-- Mode de Rendu Ultra Simple -->
+      <div class="section-title" style="background-color: #2B6CB0; color: white;">Rendu de Topologie</div>
+      <div class="sidebar-content" style="background-color: #EBF8FF;">
+        <div class="filter-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; color: #2B6CB0;">
+            <input type="checkbox" id="chk-ultra-simple" onchange="app.toggleUltraSimple(this.checked)">
+            Mode Simple (3 VDOMs uniquement)
+          </label>
+        </div>
+      </div>
+
       <!-- Couches Activables -->
       <div class="section-title">Couches Visuelles</div>
       <div class="sidebar-content">
         <div class="filter-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-            <input type="checkbox" checked onchange="app.toggleLayer('physical', this.checked)">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;" id="layer-physical-label">
+            <input type="checkbox" checked id="chk-layer-physical" onchange="app.toggleLayer('physical', this.checked)">
             Topologie Physique (Interfaces)
           </label>
         </div>
         <div class="filter-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-            <input type="checkbox" checked onchange="app.toggleLayer('logical', this.checked)">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;" id="layer-logical-label">
+            <input type="checkbox" checked id="chk-layer-logical" onchange="app.toggleLayer('logical', this.checked)">
             Topologie Logique (Zones / VDOM)
           </label>
         </div>
         <div class="filter-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-            <input type="checkbox" checked onchange="app.toggleLayer('vpn', this.checked)">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;" id="layer-vpn-label">
+            <input type="checkbox" checked id="chk-layer-vpn" onchange="app.toggleLayer('vpn', this.checked)">
             Tunnels VPN IPsec / SSL
           </label>
         </div>
         <div class="filter-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-            <input type="checkbox" checked onchange="app.toggleLayer('vip', this.checked)">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;" id="layer-vip-label">
+            <input type="checkbox" checked id="chk-layer-vip" onchange="app.toggleLayer('vip', this.checked)">
             VIP et NAT (DNAT/SNAT)
           </label>
         </div>
         <div class="filter-group">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-            <input type="checkbox" checked onchange="app.toggleLayer('flows', this.checked)">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;" id="layer-flows-label">
+            <input type="checkbox" checked id="chk-layer-flows" onchange="app.toggleLayer('flows', this.checked)">
             Flux de Politiques Firewall
           </label>
         </div>

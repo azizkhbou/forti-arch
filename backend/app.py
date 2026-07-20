@@ -68,11 +68,12 @@ def analyze_config():
                 vd["content"] = anonymize_ip_addresses(vd["content"])
 
         # Run topology processor
-        device, topology = TopologyBuilder.process_configs(global_data, vdoms_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data, vdoms_data)
 
         # Save into memory
         LATEST_ANALYSIS["device"] = device
         LATEST_ANALYSIS["topology"] = topology
+        LATEST_ANALYSIS["simple_topology"] = simple_topology
 
         # Keep track of line sources for "View Source" functionality
         LATEST_ANALYSIS["original_files"] = {
@@ -85,7 +86,8 @@ def analyze_config():
         return jsonify({
             "success": True,
             "device": device.to_dict(),
-            "topology": topology
+            "topology": topology,
+            "simple_topology": simple_topology
         })
 
     except Exception as e:

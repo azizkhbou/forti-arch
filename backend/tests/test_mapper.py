@@ -23,7 +23,7 @@ class TestFortiGateMapper(unittest.TestCase):
             content = f.read()
 
         global_data = {"filename": "fictional_single_vdom.conf", "content": content}
-        device, topology = TopologyBuilder.process_configs(global_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
 
         # Verify General metadata
         self.assertEqual(device.hostname, "FortiGate-Fictif-Single")
@@ -50,7 +50,7 @@ class TestFortiGateMapper(unittest.TestCase):
             content = f.read()
 
         global_data = {"filename": "fictional_three_vdoms.conf", "content": content}
-        device, topology = TopologyBuilder.process_configs(global_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
 
         # Verify General metadata
         self.assertEqual(device.hostname, "FortiGate-Fictif-3VDOM")
@@ -93,7 +93,7 @@ class TestFortiGateMapper(unittest.TestCase):
             content = f.read()
 
         global_data = {"filename": "fictional_three_vdoms.conf", "content": content}
-        device, topology = TopologyBuilder.process_configs(global_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
 
         # Check findings
         findings = device.findings
@@ -111,7 +111,7 @@ class TestFortiGateMapper(unittest.TestCase):
             content = f.read()
 
         global_data = {"filename": "fictional_single_vdom.conf", "content": content}
-        device, topology = TopologyBuilder.process_configs(global_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
 
         xml_bytes = DrawioExporter.generate_drawio_xml(topology)
         self.assertTrue(len(xml_bytes) > 0)
@@ -130,12 +130,34 @@ class TestFortiGateMapper(unittest.TestCase):
             content = f.read()
 
         global_data = {"filename": "fictional_single_vdom.conf", "content": content}
-        device, topology = TopologyBuilder.process_configs(global_data)
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
 
         csv_str = ReportExporter.generate_inventory_csv(device, "interfaces")
         self.assertIn("VDOM", csv_str)
         self.assertIn("port1", csv_str)
         self.assertIn("vlan10", csv_str)
+
+    def test_simple_topology_generation(self):
+        """Tests that build_simple_relationships successfully extracts correct VDOM & connection nodes."""
+        self.assertTrue(os.path.exists(self.three_vdoms_path))
+        with open(self.three_vdoms_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        global_data = {"filename": "fictional_three_vdoms.conf", "content": content}
+        device, topology, simple_topology = TopologyBuilder.process_configs(global_data)
+
+        # Check nodes
+        node_ids = [n["id"] for n in simple_topology["nodes"]]
+        self.assertIn("node_internet", node_ids)
+        self.assertIn("vdom_root", node_ids)
+        self.assertIn("vdom_vdom_lan", node_ids)
+        self.assertIn("vdom_vdom_dmz", node_ids)
+
+        # Check edges
+        edge_ids = [e["id"] for e in simple_topology["edges"]]
+        # We should find at least one simple route link to Internet
+        route_links = [e for e in simple_topology["edges"] if e["type"] == "route_link"]
+        self.assertTrue(len(route_links) > 0)
 
 if __name__ == "__main__":
     unittest.main()
