@@ -19,6 +19,24 @@ class FortiGateApp {
             flows: true
         };
         this.currentInventory = 'interfaces';
+        this.ultraSimpleMode = false;
+    }
+
+    toggleUltraSimple(isChecked) {
+        this.ultraSimpleMode = isChecked;
+
+        // Hide/Show visual layers panel elements when simple mode is active
+        const layers = ['physical', 'logical', 'vpn', 'vip'];
+        layers.forEach(layer => {
+            const labelEl = document.getElementById(`layer-${layer}-label`);
+            if (labelEl) {
+                labelEl.style.opacity = isChecked ? '0.4' : '1.0';
+                labelEl.style.pointerEvents = isChecked ? 'none' : 'auto';
+            }
+        });
+
+        // Apply or reset graph view
+        this.renderNetworkGraph();
     }
 
     switchMode(mode) {
@@ -180,7 +198,7 @@ class FortiGateApp {
     }
 
     renderNetworkGraph() {
-        const top = this.analysisData.topology;
+        const top = this.ultraSimpleMode ? this.analysisData.simple_topology : this.analysisData.topology;
 
         // Assemble cytoscape elements (nodes & edges)
         const cyElements = [];
@@ -192,7 +210,7 @@ class FortiGateApp {
                     id: node.id,
                     label: node.label,
                     type: node.type,
-                    parent: node.parent || undefined,
+                    parent: this.ultraSimpleMode ? undefined : (node.parent || undefined),
                     details: node.details,
                     vdom: node.vdom || 'root'
                 }
@@ -252,14 +270,17 @@ class FortiGateApp {
                 {
                     selector: 'node[type="vdom"]',
                     style: {
-                        'background-color': 'rgba(235, 248, 255, 0.4)',
+                        'background-color': this.ultraSimpleMode ? '#1A365D' : 'rgba(235, 248, 255, 0.4)',
                         'border-color': '#3182CE',
                         'border-style': 'solid',
                         'border-width': '2px',
-                        'text-valign': 'top',
+                        'text-valign': this.ultraSimpleMode ? 'center' : 'top',
                         'text-halign': 'center',
-                        'font-size': '12px',
-                        'font-weight': 'bold'
+                        'font-size': this.ultraSimpleMode ? '14px' : '12px',
+                        'font-weight': 'bold',
+                        'color': this.ultraSimpleMode ? '#FFFFFF' : '#2D3748',
+                        'width': this.ultraSimpleMode ? '160px' : '100px',
+                        'height': this.ultraSimpleMode ? '60px' : '50px'
                     }
                 },
                 {
@@ -379,6 +400,15 @@ class FortiGateApp {
                         'target-arrow-color': '#E53E3E',
                         'width': 3
                     }
+                },
+                {
+                    selector: 'edge[type="route_link"]',
+                    style: {
+                        'line-color': '#D69E2E',
+                        'target-arrow-color': '#D69E2E',
+                        'line-style': 'dashed',
+                        'width': 2.5
+                    }
                 }
             ],
             layout: {
@@ -398,6 +428,26 @@ class FortiGateApp {
 
     reorganizeLayout() {
         if (!this.cy) return;
+
+        // If simple mode, arrange VDOMs and Internet elegantly
+        if (this.ultraSimpleMode) {
+            const internetNode = this.cy.getElementById('node_internet');
+            if (internetNode.length > 0) {
+                internetNode.position({ x: 600, y: 100 });
+            }
+
+            const vdoms = this.cy.nodes('[type="vdom"]');
+            const vdomCount = vdoms.length;
+            const startX = 600 - ((vdomCount - 1) * 300) / 2;
+            const vdomY = 350;
+
+            vdoms.forEach((vdomNode, idx) => {
+                vdomNode.position({ x: startX + (idx * 300), y: vdomY });
+            });
+
+            this.cy.fit();
+            return;
+        }
 
         // Elegant layout algorithm:
         // Internet is always at top center: {x: 600, y: 50}
@@ -564,6 +614,19 @@ class FortiGateApp {
             // Restore visibility of all elements
             this.cy.elements().removeClass('filtered-out');
             this.cy.elements().show();
+
+            // Under Ultra-Simple mode, hide interface, zone, vpn, vip and ignore toggle controls
+            if (this.ultraSimpleMode) {
+                this.cy.elements('node[type="interface"], node[type="zone"], node[type="vpn"], node[type="vip"], node[type="server"], node[type="subnet"], node[type="remote_site"]').hide();
+                // Also hide irrelevant edges
+                this.cy.elements('edge[type="wan_link"], edge[type="vpn_tunnel"], edge[type="vip_link"], edge[type="subnet_link"], edge[type="subnet_link_deduced"]').hide();
+
+                // Show policy flows and route links
+                if (!this.activeLayerSettings.flows) {
+                    this.cy.elements('edge[type="policy_flow"]').hide();
+                }
+                return;
+            }
 
             // Layer hides
             if (!this.activeLayerSettings.physical) {

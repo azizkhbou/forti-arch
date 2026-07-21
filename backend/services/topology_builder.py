@@ -33,5 +33,6 @@ class TopologyBuilder:
 
         # Build visual network topology nodes & edges
         topology = RelationshipEngine.build_relationships(device)
+        simple_topology = RelationshipEngine.build_simple_relationships(device)
 
-        return device, topology
+        return device, topology, simple_topology

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Architecture - FortiGate-Fictif-3VDOM</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        body { margin:0; padding:0; font-family:sans-serif; height:100vh; display:flex; flex-direction:column; background-color: #1A202C; color: #E2E8F0; }
+        header { background:#2D3748; padding:20px; border-bottom:3px solid #C1272D; display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin:0; font-size:1.5rem; color: #FFF; }
+        p { margin:5px 0 0; font-size:0.85rem; color:#A0AEC0; }
+        #cy { flex:1; background:#111; }
+        .badge { background: #C1272D; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Simple FortiGate VDOM Architecture — FortiGate-Fictif-3VDOM</h1>
+            <p>Model: FG-200F | Version: v7.2.4 | Serial: FG200FTK23000999</p>
+        </div>
+        <span class="badge">Ultra-Simple View</span>
+    </header>
+    <div id="cy"></div>
+    <script>
+        const data = {"device": {"hostname": "FortiGate-Fictif-3VDOM", "model": "FG-200F", "version": "v7.2.4", "serial_number": "FG200FTK23000999", "quality_report": {"lines_analyzed": 131, "vdoms_detected": 3, "interfaces": 5, "zones": 2, "vlans": 0, "routes": 1, "policies": 2, "vips": 1, "vpns": 0, "objects": 3, "uninterpreted_lines": 0, "completeness": 100}, "vdoms": {"root": {"name": "root", "mode": "NAT", "interfaces": {"port1": {"id": "intf_port1", "name": "port1", "alias": "", "type": "physical", "vdom": "root", "ip": "203.0.113.50", "mask": "255.255.255.240", "role": "wan", "vlan_id": null, "interface_parent": "", "status": "up", "admin_access": [], "dhcp_mode": "none", "zone": "", "lacp_members": [], "source_file": "fictional_three_vdoms.conf", "start_line": 21, "raw_config": "            edit \"port1\"\n                set vdom \"root\"\n                set ip 203.0.113.50 255.255.255.240\n                set type physical\n                set role wan\n                set status up\n            next"}}, "zones": {}, "address_objects": {}, "address_groups": {}, "service_objects": {}, "service_groups": {}, "policies": [], "routes": [{"id": "route_140058237046944", "vdom": "root", "type": "default", "destination": "0.0.0.0 0.0.0.0", "gateway": "203.0.113.33", "device": "port1", "distance": 10, "priority": 0, "blackhole": false, "extra_info": {}, "source_file": "fictional_three_vdoms.conf", "start_line": 30, "raw_config": "            edit 1\n                set dst 0.0.0.0 0.0.0.0\n                set gateway 203.0.113.33\n                set device \"port1\"\n            next"}], "vips": {}, "ip_pools": {}, "vpns": {}, "inter_vdom_links": []}, "vdom_lan": {"name": "vdom_lan", "mode": "NAT", "interfaces": {"port2": {"id": "intf_port2", "name": "port2", "alias": "", "type": "physical", "vdom": "vdom_lan", "ip": "10.1.1.254", "mask": "255.255.255.0", "role": "lan", "vlan_id": null, "interface_parent": "", "status": "up", "admin_access": [], "dhcp_mode": "none", "zone": "Zone-Internal", "lacp_members": [], "source_file": "fictional_three_vdoms.conf", "start_line": 40, "raw_config": "            edit \"port2\"\n                set vdom \"vdom_lan\"\n                set ip 10.1.1.254 255.255.255.0\n                set type physical\n                set role lan\n                set status up\n            next"}, "vlink_lan0": {"id": "intf_vlink_lan0", "name": "vlink_lan0", "alias": "", "type": "vdom-link", "vdom": "vdom_lan", "ip": "0.0.0.0", "mask": "0.0.0.0", "role": "undefined", "vlan_id": null, "interface_parent": "", "status": "up", "admin_access": [], "dhcp_mode": "none", "zone": "", "lacp_members": [], "source_file": "fictional_three_vdoms.conf", "start_line": 47, "raw_config": "            edit \"vlink_lan0\"\n                set vdom \"vdom_lan\"\n                set type vdom-link\n                set status up\n            next"}}, "zones": {"Zone-Internal": {"id": "zone_Zone-Internal", "name": "Zone-Internal", "vdom": "vdom_lan", "interfaces": ["port2"], "intrazone": "deny", "role": "undefined", "source_file": "fictional_three_vdoms.conf", "start_line": 54, "raw_config": "            edit \"Zone-Internal\"\n                set interface \"port2\"\n            next"}}, "address_objects": {"LAN-Subnet-10": {"id": "addr_LAN-Subnet-10", "name": "LAN-Subnet-10", "type": "subnet", "value": "10.1.1.0 255.255.255.0", "associated_interface": "", "vdom": "vdom_lan", "source_file": "fictional_three_vdoms.conf", "start_line": 59, "raw_config": "            edit \"LAN-Subnet-10\"\n                set type subnet\n                set subnet 10.1.1.0 255.255.255.0\n            next"}, "Any": {"id": "addr_Any", "name": "Any", "type": "subnet", "value": "0.0.0.0 0.0.0.0", "associated_interface": "", "vdom": "vdom_lan", "source_file": "fictional_three_vdoms.conf", "start_line": 63, "raw_config": "            edit \"Any\"\n                set type subnet\n                set subnet 0.0.0.0 0.0.0.0\n            next"}}, "address_groups": {}, "service_objects": {}, "service_groups": {}, "policies": [{"id": "policy_10", "policy_id": "10", "name": "LAN-Access", "vdom": "vdom_lan", "srcintf": ["Zone-Internal"], "dstintf": ["vlink_lan0"], "srcaddr": ["LAN-Subnet-10"], "dstaddr": ["Any"], "service": ["ALL"], "action": "accept", "nat": false, "ippool": "", "ssl_inspection": false, "ips_sensor": "", "av_profile": "", "webfilter_profile": "", "app_control": "", "logtraffic": "disable", "status": "enable", "schedule": "always", "comments": "", "order": 1, "source_file": "fictional_three_vdoms.conf", "start_line": 69, "raw_config": "            edit 10\n                set name \"LAN-Access\"\n                set srcintf \"Zone-Internal\"\n                set dstintf \"vlink_lan0\"\n                set srcaddr \"LAN-Subnet-10\"\n                set dstaddr \"Any\"\n                set action accept\n                set service \"ALL\"\n                set status enable\n            next"}], "routes": [], "vips": {}, "ip_pools": {}, "vpns": {}, "inter_vdom_links": []}, "vdom_dmz": {"name": "vdom_dmz", "mode": "NAT", "interfaces": {"port3": {"id": "intf_port3", "name": "port3", "alias": "", "type": "physical", "vdom": "vdom_dmz", "ip": "172.16.50.254", "mask": "255.255.255.0", "role": "dmz", "vlan_id": null, "interface_parent": "", "status": "up", "admin_access": [], "dhcp_mode": "none", "zone": "Zone-DMZ", "lacp_members": [], "source_file": "fictional_three_vdoms.conf", "start_line": 84, "raw_config": "            edit \"port3\"\n                set vdom \"vdom_dmz\"\n                set ip 172.16.50.254 255.255.255.0\n                set type physical\n                set role dmz\n                set status up\n            next"}, "vlink_dmz0": {"id": "intf_vlink_dmz0", "name": "vlink_dmz0", "alias": "", "type": "vdom-link", "vdom": "vdom_dmz", "ip": "0.0.0.0", "mask": "0.0.0.0", "role": "undefined", "vlan_id": null, "interface_parent": "", "status": "up", "admin_access": [], "dhcp_mode": "none", "zone": "", "lacp_members": [], "source_file": "fictional_three_vdoms.conf", "start_line": 91, "raw_config": "            edit \"vlink_dmz0\"\n                set vdom \"vdom_dmz\"\n                set type vdom-link\n                set status up\n            next"}}, "zones": {"Zone-DMZ": {"id": "zone_Zone-DMZ", "name": "Zone-DMZ", "vdom": "vdom_dmz", "interfaces": ["port3"], "intrazone": "deny", "role": "DMZ", "source_file": "fictional_three_vdoms.conf", "start_line": 98, "raw_config": "            edit \"Zone-DMZ\"\n                set interface \"port3\"\n            next"}}, "address_objects": {"DMZ-Subnet-172": {"id": "addr_DMZ-Subnet-172", "name": "DMZ-Subnet-172", "type": "subnet", "value": "172.16.50.0 255.255.255.0", "associated_interface": "", "vdom": "vdom_dmz", "source_file": "fictional_three_vdoms.conf", "start_line": 103, "raw_config": "            edit \"DMZ-Subnet-172\"\n                set type subnet\n                set subnet 172.16.50.0 255.255.255.0\n            next"}}, "address_groups": {}, "service_objects": {}, "service_groups": {}, "policies": [{"id": "policy_20", "policy_id": "20", "name": "DMZ-Publish", "vdom": "vdom_dmz", "srcintf": ["vlink_dmz0"], "dstintf": ["Zone-DMZ"], "srcaddr": ["Any"], "dstaddr": ["VIP-WebServer"], "service": ["HTTPS"], "action": "accept", "nat": false, "ippool": "", "ssl_inspection": false, "ips_sensor": "", "av_profile": "", "webfilter_profile": "", "app_control": "", "logtraffic": "disable", "status": "enable", "schedule": "always", "comments": "", "order": 1, "source_file": "fictional_three_vdoms.conf", "start_line": 119, "raw_config": "            edit 20\n                set name \"DMZ-Publish\"\n                set srcintf \"vlink_dmz0\"\n                set dstintf \"Zone-DMZ\"\n                set srcaddr \"Any\"\n                set dstaddr \"VIP-WebServer\"\n                set action accept\n                set service \"HTTPS\"\n                set status enable\n            next"}], "routes": [], "vips": {"VIP-WebServer": {"id": "vip_VIP-WebServer", "name": "VIP-WebServer", "vdom": "vdom_dmz", "extip": "203.0.113.55", "mappedip": "172.16.50.10", "extintf": "vlink_dmz0", "portforward": true, "extport": "443", "mappedport": "443", "source_file": "fictional_three_vdoms.conf", "start_line": 109, "raw_config": "            edit \"VIP-WebServer\"\n                set extip 203.0.113.55\n                set mappedip 172.16.50.10\n                set extintf \"vlink_dmz0\"\n                set portforward enable\n                set extport 443\n                set mappedport 443\n            next"}}, "ip_pools": {}, "vpns": {}, "inter_vdom_links": []}}, "findings": [{"id": "finding_140058237046992", "category": "interface", "severity": "low", "description": "L'interface physique 'vlink_lan0' est active mais n'a pas d'adresse IP configur\u00e9e.", "item_type": "Interface", "item_name": "vlink_lan0", "vdom": "vdom_lan"}, {"id": "finding_140058237046848", "category": "policy", "severity": "low", "description": "R\u00e8gle '10' autorise le flux sans journalisation (logtraffic d\u00e9sactiv\u00e9).", "item_type": "FirewallPolicy", "item_name": "10", "vdom": "vdom_lan"}, {"id": "finding_140058237046800", "category": "policy", "severity": "medium", "description": "R\u00e8gle '10' autorise le service 'ALL/ANY' entre 'Zone-Internal' et 'vlink_lan0'.", "item_type": "FirewallPolicy", "item_name": "10", "vdom": "vdom_lan"}, {"id": "finding_140058237047040", "category": "interface", "severity": "low", "description": "L'interface physique 'vlink_dmz0' est active mais n'a pas d'adresse IP configur\u00e9e.", "item_type": "Interface", "item_name": "vlink_dmz0", "vdom": "vdom_dmz"}, {"id": "finding_140058237048000", "category": "object", "severity": "info", "description": "L'objet adresse 'DMZ-Subnet-172' n'est utilis\u00e9 dans aucune politique ou groupe d'adresses.", "item_type": "AddressObject", "item_name": "DMZ-Subnet-172", "vdom": "vdom_dmz"}, {"id": "finding_140058237047856", "category": "policy", "severity": "low", "description": "R\u00e8gle '20' autorise le flux sans journalisation (logtraffic d\u00e9sactiv\u00e9).", "item_type": "FirewallPolicy", "item_name": "20", "vdom": "vdom_dmz"}]}, "topology": {"nodes": [{"id": "node_internet", "label": "Internet", "type": "internet", "vdom": "global", "details": {"description": "R\u00e9seau public / WAN"}}, {"id": "vdom_root", "label": "VDOM: root", "type": "vdom", "details": {"mode": "NAT", "name": "root"}}, {"id": "vdom_vdom_lan", "label": "VDOM: vdom_lan", "type": "vdom", "details": {"mode": "NAT", "name": "vdom_lan"}}, {"id": "vdom_vdom_dmz", "label": "VDOM: vdom_dmz", "type": "vdom", "details": {"mode": "NAT", "name": "vdom_dmz"}}], "edges": [{"id": "simple_route_root_to_Internet_0.0.0.0_0.0.0.0", "source": "vdom_root", "target": "node_internet", "label": "Route: 0.0.0.0 0.0.0.0 via port1", "type": "route_link", "details": {"vdom": "root", "destination": "0.0.0.0 0.0.0.0", "gateway": "203.0.113.33", "interface": "port1"}}]}};
+        const cyElements = [];
+        data.topology.nodes.forEach(n => {
+            cyElements.push({ data: { id: n.id, label: n.label, type: n.type, parent: n.parent } });
+        });
+        data.topology.edges.forEach(e => {
+            cyElements.push({ data: { id: e.id, source: e.source, target: e.target, label: e.label, type: e.type } });
+        });
+
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: cyElements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': '#4A5568',
+                        'border-color': '#CBD5E0',
+                        'border-width': '2px',
+                        'label': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': '14px',
+                        'color': '#FFF',
+                        'shape': 'round-rectangle',
+                        'width': '180px',
+                        'height': '70px',
+                        'text-wrap': 'wrap'
+                    }
+                },
+                {
+                    selector: 'node[type="vdom"]',
+                    style: {
+                        'background-color': '#1A365D',
+                        'border-color': '#3182CE',
+                        'font-weight': 'bold'
+                    }
+                },
+                {
+                    selector: 'node[type="internet"]',
+                    style: {
+                        'background-color': '#2B6CB0',
+                        'border-color': '#63B3ED',
+                        'shape': 'ellipse',
+                        'width': '120px',
+                        'height': '120px',
+                        'font-weight': 'bold'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#718096',
+                        'target-arrow-color': '#718096',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'label': 'data(label)',
+                        'font-size': '10px',
+                        'color': '#FFF',
+                        'text-background-opacity': 0.8,
+                        'text-background-color': '#2D3748',
+                        'text-background-padding': '4px',
+                        'text-background-shape': 'round-rectangle'
+                    }
+                },
+                {
+                    selector: 'edge[type="route_link"]',
+                    style: {
+                        'line-color': '#D69E2E',
+                        'target-arrow-color': '#D69E2E',
+                        'line-style': 'dashed'
+                    }
+                },
+                {
+                    selector: 'edge[type="policy_flow"]',
+                    style: {
+                        'line-color': '#38A169',
+                        'target-arrow-color': '#38A169'
+                    }
+                }
+            ],
+            layout: {
+                name: 'circle',
+                padding: 100
+            }
+        });
+
+        // Arrange with Internet at the top if present
+        const internet = cy.getElementById('node_internet');
+        if (internet.length > 0) {
+            // Custom layout
+            const vdoms = cy.nodes('[type="vdom"]');
+            const numVdoms = vdoms.length;
+
+            internet.position({ x: 500, y: 150 });
+
+            const startX = 500 - ((numVdoms - 1) * 300) / 2;
+            vdoms.forEach((v, idx) => {
+                v.position({ x: startX + (idx * 300), y: 400 });
+            });
+            cy.fit();
+        }
+    </script>
+</body>
+</html>

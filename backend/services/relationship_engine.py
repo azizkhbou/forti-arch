@@ -412,3 +412,145 @@ class RelationshipEngine:
             return ".".join(net_parts)
         except Exception:
             return "0.0.0.0"
+
+    @staticmethod
+    def build_simple_relationships(device):
+        """
+        Builds a simplified topology consisting ONLY of VDOM nodes, Internet node,
+        and the Routing / Policy links connecting them to each other.
+        """
+        topology = {
+            "nodes": [],
+            "edges": []
+        }
+
+        # 1. Internet Node
+        topology["nodes"].append({
+            "id": "node_internet",
+            "label": "Internet",
+            "type": "internet",
+            "vdom": "global",
+            "details": {"description": "Réseau public / WAN"}
+        })
+
+        # 2. VDOM Nodes
+        for vdom_name, vdom in device.vdoms.items():
+            topology["nodes"].append({
+                "id": f"vdom_{vdom_name}",
+                "label": f"VDOM: {vdom_name}",
+                "type": "vdom",
+                "details": {"mode": vdom.mode, "name": vdom_name}
+            })
+
+        # Build map: (VDOM, interface_name) -> target_destination (either other VDOM name, or 'Internet')
+        interface_target_map = {}
+
+        # First, find all vdom-link pairs
+        vdom_links_pairs = {}
+        for vdom_name, vdom in device.vdoms.items():
+            for intf_name, intf in vdom.interfaces.items():
+                if intf.type == "vdom-link" or "vlink" in intf_name.lower():
+                    # clean base name
+                    base_name = re.sub(r'[01]$', '', intf_name)
+                    vdom_links_pairs.setdefault(base_name, []).append((vdom_name, intf_name))
+
+        # Map each vdom-link to its peer VDOM
+        for base, pairs in vdom_links_pairs.items():
+            if len(pairs) >= 2:
+                for idx in range(len(pairs)):
+                    va, ia = pairs[idx]
+                    # find peer
+                    for oidx, (vb, ib) in enumerate(pairs):
+                        if idx != oidx and va != vb:
+                            interface_target_map[(va, ia)] = vb
+                            break
+
+        # Map WAN interfaces to 'Internet'
+        for vdom_name, vdom in device.vdoms.items():
+            for intf_name, intf in vdom.interfaces.items():
+                is_wan = (intf.role.lower() == "wan" or
+                          "wan" in intf_name.lower() or
+                          "internet" in intf_name.lower() or
+                          "port1" in intf_name.lower()) # often port1 is WAN in samples
+                if is_wan and (vdom_name, intf_name) not in interface_target_map:
+                    interface_target_map[(vdom_name, intf_name)] = "Internet"
+
+        # 3. Process Routing
+        # We want to show how VDOMs are routed to each other or to Internet.
+        route_edges = []
+        for vdom_name, vdom in device.vdoms.items():
+            for route in vdom.routes:
+                dev_name = route.device
+                if not dev_name:
+                    continue
+
+                target = interface_target_map.get((vdom_name, dev_name))
+                if target:
+                    target_id = "node_internet" if target == "Internet" else f"vdom_{target}"
+                    edge_id = f"simple_route_{vdom_name}_to_{target}_{route.destination.replace('/', '_').replace(' ', '_')}"
+
+                    # Avoid duplicates
+                    if any(e["id"] == edge_id for e in route_edges):
+                        continue
+
+                    route_edges.append({
+                        "id": edge_id,
+                        "source": f"vdom_{vdom_name}",
+                        "target": target_id,
+                        "label": f"Route: {route.destination} via {dev_name}",
+                        "type": "route_link",
+                        "details": {
+                            "vdom": vdom_name,
+                            "destination": route.destination,
+                            "gateway": route.gateway,
+                            "interface": dev_name
+                        }
+                    })
+        topology["edges"].extend(route_edges)
+
+        # 4. Process Policies
+        policy_edges = []
+        for vdom_name, vdom in device.vdoms.items():
+            for pol in vdom.policies:
+                if pol.status == "disable":
+                    continue
+
+                for src in pol.srcintf:
+                    for dst in pol.dstintf:
+                        src_target = interface_target_map.get((vdom_name, src), vdom_name)
+                        dst_target = interface_target_map.get((vdom_name, dst), vdom_name)
+
+                        if src_target != dst_target:
+                            src_id = "node_internet" if src_target == "Internet" else f"vdom_{src_target}"
+                            dst_id = "node_internet" if dst_target == "Internet" else f"vdom_{dst_target}"
+
+                            flow_id = f"simple_flow_{vdom_name}_{pol.policy_id}_{src_target}_to_{dst_target}"
+
+                            # Avoid duplicates
+                            if any(e["id"] == flow_id for e in policy_edges):
+                                continue
+
+                            label_val = f"ID {pol.policy_id}"
+                            if pol.name:
+                                label_val += f" ({pol.name})"
+
+                            policy_edges.append({
+                                "id": flow_id,
+                                "source": src_id,
+                                "target": dst_id,
+                                "label": f"Policy {label_val}: {src} -> {dst}",
+                                "type": "policy_flow",
+                                "details": {
+                                    "policy_id": pol.policy_id,
+                                    "name": pol.name,
+                                    "vdom": vdom_name,
+                                    "action": pol.action,
+                                    "nat": pol.nat,
+                                    "services": pol.service,
+                                    "srcaddr": pol.srcaddr,
+                                    "dstaddr": pol.dstaddr
+                                }
+                            })
+        topology["edges"].extend(policy_edges)
+
+        return topology
