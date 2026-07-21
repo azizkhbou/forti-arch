@@ -233,7 +233,7 @@ class DrawioExporter:
                     z_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == zone["id"]]
                     for i_idx, intf in enumerate(z_intfs):
                         coords[intf["id"]] = {"x": 10, "y": 35 + (i_idx * 45), "width": 110, "height": 40}
-                    lan_y += 110
+                    lan_y += 110 + (len(z_intfs) * 45)
 
             # Standard LAN interfaces/subnets
             lan_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("lan" in i["label"].lower() or "port2" in i["label"].lower())]
@@ -256,7 +256,7 @@ class DrawioExporter:
                     z_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == zone["id"]]
                     for i_idx, intf in enumerate(z_intfs):
                         coords[intf["id"]] = {"x": 10, "y": 35 + (i_idx * 45), "width": 110, "height": 40}
-                    dmz_y += 110
+                    dmz_y += 110 + (len(z_intfs) * 45)
 
             dmz_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("dmz" in i["label"].lower() or "port3" in i["label"].lower())]
             for i in dmz_intfs:
@@ -273,10 +273,22 @@ class DrawioExporter:
                 coords[s["id"]] = {"x": 300, "y": dmz_y, "width": 110, "height": 40}
                 dmz_y += 45
 
-            # 3. WAN / VPN column (Center)
+            # 3. WAN / VPN / MPLS column (Center)
             wan_y = 60
-            wan_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("wan" in i["label"].lower() or "port1" in i["label"].lower() or "vlink" in i["label"].lower())]
+            for zone in v_zones:
+                z_name = zone["label"].lower()
+                if "mpls" in z_name or "wan" in z_name or "transit" in z_name:
+                    coords[zone["id"]] = {"x": 160, "y": wan_y, "width": 130, "height": 100}
+
+                    z_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == zone["id"]]
+                    for i_idx, intf in enumerate(z_intfs):
+                        coords[intf["id"]] = {"x": 10, "y": 35 + (i_idx * 45), "width": 110, "height": 40}
+                    wan_y += 110 + (len(z_intfs) * 45)
+
+            wan_intfs = [i for i in nodes if i["type"] == "interface" and i.get("parent") == vid and ("wan" in i["label"].lower() or "port1" in i["label"].lower() or "vlink" in i["label"].lower() or "mpls" in i["label"].lower())]
             for i in wan_intfs:
+                if any(zone["id"] == i.get("parent") for zone in v_zones):
+                    continue
                 coords[i["id"]] = {"x": 160, "y": wan_y, "width": 120, "height": 40}
                 wan_y += 45
 
