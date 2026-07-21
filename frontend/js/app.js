@@ -489,20 +489,20 @@ class FortiGateApp {
             const vpns = this.cy.nodes(`[type="vpn"][parent="${vdomId}"]`);
             const servers = this.cy.nodes(`[type="server"][parent="${vdomId}"]`);
 
-            // 1. LAN column (Left, Offset x: -150)
+            // 1. LAN column (Left, Offset x: -220)
             let lanY = vdomY + 80;
             zones.forEach(zone => {
                 const zName = zone.data('label').toLowerCase();
                 if (zName.includes('lan') || zName.includes('internal') || zName.includes('usr')) {
-                    zone.position({ x: vdomX - 150, y: lanY });
+                    zone.position({ x: vdomX - 220, y: lanY });
 
                     // Position interfaces inside LAN zone
                     const zoneId = zone.id();
                     const zoneIntfs = this.cy.nodes(`[type="interface"][parent="${zoneId}"]`);
                     zoneIntfs.forEach((zi, zidx) => {
-                        zi.position({ x: vdomX - 150, y: lanY + 50 + (zidx * 60) });
+                        zi.position({ x: vdomX - 220, y: lanY + 60 + (zidx * 60) });
                     });
-                    lanY += 150;
+                    lanY += 180 + (zoneIntfs.length * 60);
                 }
             });
 
@@ -511,8 +511,8 @@ class FortiGateApp {
                 const label = intf.data('label').toLowerCase();
                 const parent = intf.data('parent');
                 if (parent === vdomId && (label.includes('lan') || label.includes('port2'))) {
-                    intf.position({ x: vdomX - 150, y: lanY });
-                    lanY += 70;
+                    intf.position({ x: vdomX - 220, y: lanY });
+                    lanY += 80;
                 }
             });
 
@@ -520,24 +520,24 @@ class FortiGateApp {
             subnets.forEach(sub => {
                 const label = sub.data('label').toLowerCase();
                 if (label.includes('lan') || label.includes('10.')) {
-                    sub.position({ x: vdomX - 150, y: lanY });
-                    lanY += 75;
+                    sub.position({ x: vdomX - 220, y: lanY });
+                    lanY += 80;
                 }
             });
 
-            // 2. DMZ & Servers column (Right, Offset x: 150)
+            // 2. DMZ & Servers column (Right, Offset x: 220)
             let dmzY = vdomY + 80;
             zones.forEach(zone => {
                 const zName = zone.data('label').toLowerCase();
                 if (zName.includes('dmz') || zName.includes('srv') || zName.includes('server')) {
-                    zone.position({ x: vdomX + 150, y: dmzY });
+                    zone.position({ x: vdomX + 220, y: dmzY });
 
                     const zoneId = zone.id();
                     const zoneIntfs = this.cy.nodes(`[type="interface"][parent="${zoneId}"]`);
                     zoneIntfs.forEach((zi, zidx) => {
-                        zi.position({ x: vdomX + 150, y: dmzY + 50 + (zidx * 60) });
+                        zi.position({ x: vdomX + 220, y: dmzY + 60 + (zidx * 60) });
                     });
-                    dmzY += 150;
+                    dmzY += 180 + (zoneIntfs.length * 60);
                 }
             });
 
@@ -545,42 +545,62 @@ class FortiGateApp {
                 const label = intf.data('label').toLowerCase();
                 const parent = intf.data('parent');
                 if (parent === vdomId && (label.includes('dmz') || label.includes('srv') || label.includes('port3'))) {
-                    intf.position({ x: vdomX + 150, y: dmzY });
-                    dmzY += 70;
+                    intf.position({ x: vdomX + 220, y: dmzY });
+                    dmzY += 80;
                 }
             });
 
             vips.forEach(vip => {
-                vip.position({ x: vdomX + 150, y: dmzY });
-                dmzY += 80;
+                vip.position({ x: vdomX + 220, y: dmzY });
+                dmzY += 90;
             });
 
             servers.forEach(srv => {
-                srv.position({ x: vdomX + 150, y: dmzY });
-                dmzY += 70;
+                srv.position({ x: vdomX + 220, y: dmzY });
+                dmzY += 80;
             });
 
-            // 3. Transit, WAN and VPN column (Center, Offset x: 0)
+            // 3. MPLS / WAN & Transit column (Center, Offset x: 0)
             let transitY = vdomY + 80;
+
+            // Map MPLS zones specifically to avoid any overlapping
+            zones.forEach(zone => {
+                const zName = zone.data('label').toLowerCase();
+                if (zName.includes('mpls') || zName.includes('wan') || zName.includes('transit')) {
+                    zone.position({ x: vdomX, y: transitY });
+
+                    const zoneId = zone.id();
+                    const zoneIntfs = this.cy.nodes(`[type="interface"][parent="${zoneId}"]`);
+                    zoneIntfs.forEach((zi, zidx) => {
+                        zi.position({ x: vdomX, y: transitY + 60 + (zidx * 60) });
+                    });
+                    transitY += 180 + (zoneIntfs.length * 60);
+                }
+            });
+
             interfaces.forEach(intf => {
                 const label = intf.data('label').toLowerCase();
                 const parent = intf.data('parent');
-                if (parent === vdomId && (label.includes('wan') || label.includes('port1') || label.includes('vlink'))) {
+                if (parent === vdomId && (label.includes('wan') || label.includes('port1') || label.includes('vlink') || label.includes('mpls'))) {
+                    // Avoid overlapping if already positioned inside zone
+                    if (intf.data('parent') && intf.data('parent').startsWith('zone_')) {
+                        return;
+                    }
                     intf.position({ x: vdomX, y: transitY });
-                    transitY += 70;
+                    transitY += 80;
                 }
             });
 
             vpns.forEach(vpn => {
                 vpn.position({ x: vdomX, y: transitY });
-                transitY += 75;
+                transitY += 80;
             });
 
             subnets.forEach(sub => {
                 const label = sub.data('label').toLowerCase();
                 if (label.includes('any') || label.includes('0.0.0.0')) {
                     sub.position({ x: vdomX, y: transitY });
-                    transitY += 75;
+                    transitY += 80;
                 }
             });
         });
@@ -737,13 +757,54 @@ class FortiGateApp {
 
         if (data.details) {
             htmlContent += `<h4 style="margin: 10px 0 5px; border-bottom: 1px solid #CBD5E0;">Détails Techniques</h4>`;
-            Object.entries(data.details).forEach(([key, val]) => {
-                if (val && typeof val !== 'object') {
-                    htmlContent += `<p style="margin: 3px 0;"><strong>${key} :</strong> ${val}</p>`;
-                } else if (Array.isArray(val)) {
-                    htmlContent += `<p style="margin: 3px 0;"><strong>${key} :</strong> ${val.join(', ')}</p>`;
-                }
-            });
+
+            // Check if it's a policy flow to show styled security profiles nicely
+            if (data.type === 'policy_flow') {
+                const det = data.details;
+                htmlContent += `
+                    <div style="background-color: #F7FAFC; padding: 10px; border-radius: 6px; border: 1px solid #E2E8F0; margin-bottom: 10px;">
+                        <p style="margin: 3px 0;"><strong>ID de Règle :</strong> <span class="badge" style="background:#4A5568;">${det.policy_id}</span></p>
+                        <p style="margin: 3px 0;"><strong>Nom :</strong> ${det.name || '-'}</p>
+                        <p style="margin: 3px 0;"><strong>Action :</strong> <span class="badge" style="background:${det.action === 'accept' ? '#38A169' : '#E53E3E'}">${det.action.toUpperCase()}</span></p>
+                        <p style="margin: 3px 0;"><strong>NAT :</strong> ${det.nat ? 'Activé' : 'Désactivé'}</p>
+                        <p style="margin: 3px 0;"><strong>Source Addr :</strong> ${Array.isArray(det.srcaddr) ? det.srcaddr.join(', ') : (det.srcaddr || '-')}</p>
+                        <p style="margin: 3px 0;"><strong>Dest Addr :</strong> ${Array.isArray(det.dstaddr) ? det.dstaddr.join(', ') : (det.dstaddr || '-')}</p>
+                        <p style="margin: 3px 0;"><strong>Services :</strong> ${Array.isArray(det.services) ? det.services.join(', ') : (det.services || '-')}</p>
+                    </div>
+
+                    <h4 style="margin: 10px 0 5px; border-bottom: 1px solid #CBD5E0; color: #2B6CB0;">Profils de Sécurité</h4>
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${det.av_profile ? '#C6F6D5' : '#EDF2F7'}; border-radius: 4px; border: 1px solid ${det.av_profile ? '#38A169' : '#CBD5E0'};">
+                            <span style="font-weight: bold; color: ${det.av_profile ? '#22543D' : '#4A5568'};">Antivirus</span>
+                            <span style="font-size: 0.8rem; font-style: italic;">${det.av_profile || 'Désactivé'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${det.ips_sensor ? '#C6F6D5' : '#EDF2F7'}; border-radius: 4px; border: 1px solid ${det.ips_sensor ? '#38A169' : '#CBD5E0'};">
+                            <span style="font-weight: bold; color: ${det.ips_sensor ? '#22543D' : '#4A5568'};">IPS (Intrusion Prevention)</span>
+                            <span style="font-size: 0.8rem; font-style: italic;">${det.ips_sensor || 'Désactivé'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${det.app_control ? '#C6F6D5' : '#EDF2F7'}; border-radius: 4px; border: 1px solid ${det.app_control ? '#38A169' : '#CBD5E0'};">
+                            <span style="font-weight: bold; color: ${det.app_control ? '#22543D' : '#4A5568'};">Application Control</span>
+                            <span style="font-size: 0.8rem; font-style: italic;">${det.app_control || 'Désactivé'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${det.webfilter_profile ? '#C6F6D5' : '#EDF2F7'}; border-radius: 4px; border: 1px solid ${det.webfilter_profile ? '#38A169' : '#CBD5E0'};">
+                            <span style="font-weight: bold; color: ${det.webfilter_profile ? '#22543D' : '#4A5568'};">Web Filter</span>
+                            <span style="font-size: 0.8rem; font-style: italic;">${det.webfilter_profile || 'Désactivé'}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${det.ssl_inspection ? '#EBF8FF' : '#EDF2F7'}; border-radius: 4px; border: 1px solid ${det.ssl_inspection ? '#3182CE' : '#CBD5E0'};">
+                            <span style="font-weight: bold; color: ${det.ssl_inspection ? '#2B6CB0' : '#4A5568'};">SSL Inspection</span>
+                            <span style="font-size: 0.8rem; font-style: italic;">${det.ssl_inspection ? 'Activé' : 'Désactivé'}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                Object.entries(data.details).forEach(([key, val]) => {
+                    if (val && typeof val !== 'object') {
+                        htmlContent += `<p style="margin: 3px 0;"><strong>${key} :</strong> ${val}</p>`;
+                    } else if (Array.isArray(val)) {
+                        htmlContent += `<p style="margin: 3px 0;"><strong>${key} :</strong> ${val.join(', ')}</p>`;
+                    }
+                });
+            }
         }
 
         // Source Traceability Trigger

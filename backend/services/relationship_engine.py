@@ -354,7 +354,12 @@ class RelationshipEngine:
                                     "nat": pol.nat,
                                     "services": pol.service,
                                     "srcaddr": pol.srcaddr,
-                                    "dstaddr": pol.dstaddr
+                                    "dstaddr": pol.dstaddr,
+                                    "ips_sensor": pol.ips_sensor,
+                                    "av_profile": pol.av_profile,
+                                    "webfilter_profile": pol.webfilter_profile,
+                                    "app_control": pol.app_control,
+                                    "ssl_inspection": pol.ssl_inspection
                                 }
                             })
 
